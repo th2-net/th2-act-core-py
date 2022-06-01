@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import logging
+from time import time
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from th2_act.act_connector import ActConnector
@@ -105,14 +106,17 @@ class RequestProcessor:
             ActResponse class instance with received message, status and checkpoint.
         """
 
+        start_time = time()
+
         if timeout is None:
             timeout = self._context.time_remaining()
 
-        status_messages_dict, _, runtime = self._cache_processor.get_n_matching_within_timeout(
+        status_messages_dict, _ = self._cache_processor.get_n_matching_within_timeout(
             message_filters=message_filters,
             n=1,
             check_previous_messages=check_previous_messages,
-            timeout=timeout
+            timeout=timeout,
+            start_time=start_time
         )
 
         received_messages_root_event_id = self._rp_utils.create_received_messages_root_event(
@@ -122,6 +126,8 @@ class RequestProcessor:
             ),
             messages_expected=1
         )
+
+        runtime = time() - start_time
 
         self._rp_utils.create_received_messages_events(status_messages_dict=status_messages_dict,
                                                        root_event_id=received_messages_root_event_id,
@@ -152,14 +158,17 @@ class RequestProcessor:
             List of ActResponse class instances with received message, status and checkpoint.
         """
 
+        start_time = time()
+
         if timeout is None:
             timeout = self._context.time_remaining()
 
-        status_messages_dict, _, runtime = self._cache_processor.get_n_matching_within_timeout(
+        status_messages_dict, _ = self._cache_processor.get_n_matching_within_timeout(
             message_filters=message_filters,
             n=n,
             check_previous_messages=check_previous_messages,
-            timeout=timeout
+            timeout=timeout,
+            start_time=start_time
         )
 
         received_messages_root_event_id = self._rp_utils.create_received_messages_root_event(
@@ -169,6 +178,8 @@ class RequestProcessor:
             ),
             messages_expected=n
         )
+
+        runtime = time() - start_time
 
         self._rp_utils.create_received_messages_events(status_messages_dict=status_messages_dict,
                                                        root_event_id=received_messages_root_event_id,
@@ -197,14 +208,17 @@ class RequestProcessor:
             List of ActResponse class instances with received message, status and checkpoint.
         """
 
+        start_time = time()
+
         if timeout is None:
             timeout = self._context.time_remaining()
 
-        status_messages_dict, index, runtime = self._cache_processor.get_n_matching_within_timeout(
+        status_messages_dict, index = self._cache_processor.get_n_matching_within_timeout(
             message_filters=message_filters,
             n=1,
             check_previous_messages=check_previous_messages,
-            timeout=timeout
+            timeout=timeout,
+            start_time=start_time
         )
 
         received_messages_root_event_id = self._rp_utils.create_received_messages_root_event(
@@ -214,6 +228,8 @@ class RequestProcessor:
 
         for status in status_messages_dict:
             status_messages_dict[status] = self._cache_processor.get_all_before_matching_from_cache(index=index)
+
+        runtime = time() - start_time
 
         self._rp_utils.create_received_messages_events(status_messages_dict=status_messages_dict,
                                                        root_event_id=received_messages_root_event_id,
@@ -241,10 +257,12 @@ class RequestProcessor:
             List of ActResponse class instances with received message, status and checkpoint.
        """
 
+        start_time = time()
+
         if wait_time:
             self._rp_utils.wait(wait_time)
 
-        status_messages_dict, index, runtime = self._cache_processor.get_n_matching_immediately(
+        status_messages_dict, index = self._cache_processor.get_n_matching_immediately(
             message_filters=message_filters,
             check_previous_messages=check_previous_messages,
             n=1
@@ -257,6 +275,8 @@ class RequestProcessor:
 
         for status in status_messages_dict:
             status_messages_dict[status] = self._cache_processor.get_all_after_matching_from_cache(index=index)
+
+        runtime = time() - start_time
 
         self._rp_utils.create_received_messages_events(status_messages_dict=status_messages_dict,
                                                        root_event_id=received_messages_root_event_id,
@@ -283,10 +303,12 @@ class RequestProcessor:
             List of ActResponse class instances with received message, status and checkpoint.
         """
 
+        start_time = time()
+
         if wait_time:
             self._rp_utils.wait(wait_time)
 
-        status_messages_dict, index, runtime = self._cache_processor.get_n_matching_immediately(
+        status_messages_dict, index = self._cache_processor.get_n_matching_immediately(
             message_filters=message_filters,
             check_previous_messages=check_previous_messages
         )
@@ -297,6 +319,8 @@ class RequestProcessor:
                 status_messages_dict=status_messages_dict
             )
         )
+
+        runtime = time() - start_time
 
         self._rp_utils.create_received_messages_events(status_messages_dict=status_messages_dict,
                                                        root_event_id=received_messages_root_event_id,

@@ -48,14 +48,13 @@ class CacheProcessor:
                                       message_filters: Dict[Callable, int],
                                       n: int,
                                       check_previous_messages: bool,
-                                      timeout: Union[int, float]) -> Tuple[StatusMessagesDict, Optional[int], float]:
+                                      timeout: Union[int, float],
+                                      start_time: float) -> Tuple[StatusMessagesDict, Optional[int]]:
         """Returns first N received messages that match the message_filters from cache.
 
         The method will check cache until all N messages are found or until context is no more active
         or until timeout is over.
         """
-
-        start_time = time()
 
         status_messages_dict: Dict[int, List[Message]] = defaultdict(list)
         matching_message_index: Optional[int] = None
@@ -80,22 +79,18 @@ class CacheProcessor:
             else:
                 break
 
-        runtime = time() - start_time
-
         self._update_last_received_message_index(index=matching_message_index)
 
-        return status_messages_dict, matching_message_index, runtime
+        return status_messages_dict, matching_message_index
 
     def get_n_matching_immediately(self,
                                    message_filters: Dict[Callable, int],
                                    check_previous_messages: bool,
-                                   n: Optional[int] = None) -> Tuple[StatusMessagesDict, Optional[int], float]:
+                                   n: Optional[int] = None) -> Tuple[StatusMessagesDict, Optional[int]]:
         """Returns all received messages that match the message_filter from cache.
 
         The method will check cache only once.
         """
-
-        start_time = time()
 
         status_messages_dict: Dict[int, List[Message]] = defaultdict(list)
         matching_message_index: Optional[int] = None
@@ -110,11 +105,9 @@ class CacheProcessor:
                 status_messages_dict[status].append(message)
                 matching_message_index = index
 
-        runtime = time() - start_time
-
         self._update_last_received_message_index(index=matching_message_index)
 
-        return status_messages_dict, matching_message_index, runtime
+        return status_messages_dict, matching_message_index
 
     def get_filtered_message_iterator(self,
                                       message_filters: Dict[Callable, int],
@@ -191,8 +184,8 @@ class CacheProcessor:
             logger.error('Could not process incoming messages: %s' % e)
 
 
-def check(condition: Callable, message: Message) -> bool:
+def check(condition: Callable[[Message], bool], message: Message) -> bool:
     try:
-        return condition(message)  # type: ignore
+        return condition(message)
     except KeyError:
         return False

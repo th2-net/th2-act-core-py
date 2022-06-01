@@ -34,11 +34,11 @@ setup(
     long_description_content_type='text/markdown',
     author='TH2-devs',
     author_email='th2-devs@exactprosystems.com',
-    # url='https://github.com/th2-net/',
+    url='https://github.com/th2-net/',
     license='Apache License 2.0',
     python_requires='>=3.7',
     install_requires=[
-        'th2-common==3.8.2.dev2276186467',
+        'th2-common==3.8.4',
         'th2-grpc-check1==3.5.1'
     ],
     packages=[''] + find_packages(include=['th2_act', 'th2_act.*']),
