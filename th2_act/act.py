@@ -46,7 +46,7 @@ class Act:
         subscription_manager = SubscriptionManager()
         message_router.subscribe_all(subscription_manager)
 
-        self._act_conn = ActConnector(check1_connector=grpc_router.get_service(Check1Service),
+        self._act_conn = ActConnector(check1_connector=grpc_router.get_service(Check1Service),  # type: ignore
                                       message_router=message_router,
                                       event_router=event_router,
                                       subscription_manager=subscription_manager)

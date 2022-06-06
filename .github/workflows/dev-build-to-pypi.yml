@@ -14,9 +14,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       # Prepare custom build version
-      - name: Get branch name
-        id: branch
-        run: echo ::set-output name=branch_name::${GITHUB_REF#refs/*/}
       - name: Get package version
         id: pack_ver
         uses: notiz-dev/github-action-json-property@release
@@ -25,7 +22,7 @@ jobs:
           prop_path: package_version
       - name: Build custom package version
         id: release_ver
-        run: echo ::set-output name=value::"${{ steps.pack_ver.outputs.prop }}-${{ steps.branch.outputs.branch_name }}-${{ github.run_id }}"
+        run: echo ::set-output name=value::"${{ steps.pack_ver.outputs.prop }}.dev${{ github.run_id }}"
       - name: Show package version
         run: echo ${{ steps.release_ver.outputs.value }}
       - name: Set version for current build in package_info.json
