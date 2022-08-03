@@ -11,23 +11,3 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-
-import logging
-import threading
-from typing import Union
-
-logger = logging.getLogger()
-
-
-class MessageResponseMonitor:
-
-    def __init__(self) -> None:
-        self.response_lock = threading.RLock()
-        self.response_received_condition = threading.Condition(self.response_lock)
-
-    def await_sync(self, timeout: Union[int, float]) -> None:
-        try:
-            self.response_lock.acquire()
-            self.response_received_condition.wait(timeout)
-        finally:
-            self.response_lock.release()

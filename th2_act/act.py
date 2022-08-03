@@ -15,14 +15,14 @@
 import importlib
 import logging
 from pathlib import Path
+import traceback
 from typing import Any, Callable, Dict, Optional
 
-from th2_act.act_connector import ActConnector
-from th2_act.subscription_manager import SubscriptionManager
+from th2_act.handler_attributes import HandlerAttributes
+from th2_act.util.subscription_manager import SubscriptionManager
 from th2_common.schema.grpc.router.grpc_router import GrpcRouter
 from th2_common.schema.message.message_router import MessageRouter
 from th2_grpc_check1.check1_service import Check1Service
-
 
 logger = logging.getLogger()
 
@@ -46,17 +46,17 @@ class Act:
         subscription_manager = SubscriptionManager()
         message_router.subscribe_all(subscription_manager)
 
-        self._act_conn = ActConnector(check1_connector=grpc_router.get_service(Check1Service),  # type: ignore
-                                      message_router=message_router,
-                                      event_router=event_router,
-                                      subscription_manager=subscription_manager)
+        self._handler_attrs = HandlerAttributes(check1_connector=grpc_router.get_service(Check1Service),  # type: ignore
+                                                message_router=message_router,
+                                                event_router=event_router,
+                                                subscription_manager=subscription_manager)
 
         self.handlers = self._load_handlers(handlers_package_relative_path)
 
     def _load_handlers(self, handlers_package_relative_path: str) -> Dict[Callable, Callable]:
         """Uploads ActHandler classes from files and initialize them. Returns a dict with ActHandler class instance
         as key and add_servicer_to_server() function as value. The dict can be passed as an argument when
-        initializing an instance of the GRPCServer class.
+        initializing an instance of the ActServer class.
         """
 
         handlers_servicers_dict = {}
@@ -70,11 +70,12 @@ class Act:
                 handler_class = _get_handler_class_from_module(handlers_package_name, handler_path)
 
                 if handler_class:
-                    handler = handler_class(self._act_conn)
+                    handler = handler_class(self._handler_attrs)
                     handlers_servicers_dict[handler] = _get_func_add_servicer_to_server(handler)
             except Exception as e:
-                logger.error('Cannot upload handler with the path %s.%s: %s'
-                             % (handlers_package.__name__, handler_path.stem, e))
+                logger.error(f'Cannot upload handler with the path '
+                             f'{handlers_package.__name__}.{handler_path.stem}: '
+                             f'\n{"".join(traceback.format_tb(e.__traceback__))}')
 
         logger.info(f'Handlers upload finished. Total: {len(handlers_servicers_dict)} handler(s)')
 

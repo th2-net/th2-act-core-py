@@ -38,7 +38,7 @@ setup(
     license='Apache License 2.0',
     python_requires='>=3.7',
     install_requires=[
-        'th2-common==3.8.5.dev2433517083',
+        'th2-common==3.9.1',
         'th2-grpc-check1==3.6.0.dev2433840021'
     ],
     packages=[''] + find_packages(include=['th2_act', 'th2_act.*']),

@@ -20,7 +20,7 @@ import grpc
 logger = logging.getLogger()
 
 
-class GRPCServer:
+class ActServer:
     """Act server using ActHandler class instances described in act implementation.
 
     Args:
@@ -33,6 +33,8 @@ class GRPCServer:
         self.server = server
         self.handlers = handlers
 
+        self.is_running = False
+
     def start(self) -> None:
         """Starts the server. Returns None"""
 
@@ -42,6 +44,7 @@ class GRPCServer:
                 add_servicer_to_server_function(handler, self.server)
 
             self.server.start()
+            self.is_running = True
             logger.info('GRPC Server started')
             logger.info(f'Services: {[service.service_name() for service in self.server._state.generic_handlers]}')
 
@@ -52,5 +55,6 @@ class GRPCServer:
     def stop(self) -> None:
         """Stops the server. Returns None"""
 
-        self.server.stop(None)
+        if self.is_running:
+            self.server.stop(None)
         logger.info('GRPC Server stopped')

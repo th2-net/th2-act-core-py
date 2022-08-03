@@ -13,8 +13,9 @@
 #   limitations under the License.
 
 from th2_act.act import Act
-from th2_act.act_connector import ActConnector
-from th2_act.act_parameters import ActParameters
 from th2_act.act_response import ActResponse
+from th2_act.act_server import ActServer
+from th2_act.grpc_method_attributes import GrpcMethodAttributes
+from th2_act.handler_attributes import HandlerAttributes
 from th2_act.request_processor import RequestProcessor
-from th2_act.server import GRPCServer
+from th2_act.util.act_sender import ActSender

@@ -14,15 +14,19 @@
 
 import logging
 from time import time
+import traceback
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from th2_act.act_connector import ActConnector
-from th2_act.act_parameters import ActParameters
 from th2_act.act_response import ActMultiResponse, ActResponse
-from th2_act.cache_processor import CacheProcessor
-from th2_act.request_processor_utils import RequestProcessorUtils
-from th2_grpc_common.common_pb2 import Message, RequestStatus
-
+from th2_act.grpc_method_attributes import GrpcMethodAttributes
+from th2_act.handler_attributes import HandlerAttributes
+from th2_act.util.act_receiver import ActReceiver
+from th2_act.util.act_sender import ActSender
+from th2_act.util.cache import Cache
+from th2_act.util.cache_filter import CacheFilter
+from th2_act.util.grpc_context_manager import GRPCContextManager
+from th2_act.util.request_processor_utils import RequestProcessorUtils
+from th2_grpc_common.common_pb2 import Direction, Message, RequestStatus
 
 logger = logging.getLogger()
 
@@ -33,85 +37,105 @@ class RequestProcessor:
     Mainly used when implementing gRPC methods in ActHandler class.
 
     Args:
-        act_conn (ActConnector): ActConnector class instance. Generates by Act when gRPC server starts.
-        act_parameters (ActParameters): ActParameters class instance. Initialize it with act name, gRPC context,
-            request event ID and request description.
-        prefilter (lambda or function, optional): Filter for messages that the cache will collect.
+        handler_attrs (HandlerAttributes): HandlerAttributes class instance. Generates by Act when loading handlers.
+        method_attrs (GrpcMethodAttributes): GrpcMethodAttributes class instance. Initialize it with gRPC context,
+            request event ID, gRPC method name and request description.
+        prefilter (lambda or function, optional): Filter for messages that will be placed in cache.
             Defaults to None - cache will collect all messages.
     """
 
     def __init__(self,
-                 act_conn: ActConnector,
-                 act_parameters: ActParameters,
+                 handler_attrs: HandlerAttributes,
+                 method_attrs: GrpcMethodAttributes,
                  prefilter: Optional[Callable] = None):
-        self.act_name = act_parameters.act_name
-        self._context = act_parameters.context
+        self._subscription_manager = handler_attrs.subscription_manager
+        self._grpc_context_manager = GRPCContextManager(context=method_attrs.context)
 
-        self._cache_processor = CacheProcessor(context=self._context, prefilter=prefilter)
-        self._rp_utils = RequestProcessorUtils(act_conn=act_conn,
-                                               act_parameters=act_parameters,
-                                               cache_processor=self._cache_processor)
+        self._cache: Cache = Cache()
+        self._cache_filter: CacheFilter = CacheFilter(context_manager=self._grpc_context_manager, cache=self._cache)
+        self._act_receiver: ActReceiver = ActReceiver(prefilter=prefilter, cache=self._cache)
 
-        self._subscription_manager = act_conn.subscription_manager
-        self._subscription_manager.register(message_listener=self._cache_processor.message_listener)
+        self._act_sender = ActSender(message_router=handler_attrs.message_router,
+                                     event_router=handler_attrs.event_router,
+                                     grpc_context_manager=self._grpc_context_manager,
+                                     check1_connector=handler_attrs.check1_connector,
+                                     method_attrs=method_attrs)
+        self._checkpoint = self._act_sender.checkpoint
+
+        self._rp_utils = RequestProcessorUtils(act_sender=self._act_sender)
 
     def __enter__(self) -> Any:
+        self._subscription_manager.register(message_listener=self._act_receiver.message_listener)
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> Optional[bool]:
         try:
-            self._subscription_manager.unregister(message_listener=self._cache_processor.message_listener)
+            self._subscription_manager.unregister(message_listener=self._act_receiver.message_listener)
+            self.clear_cache()
             if exc_type:
-                logger.error('Exception occurred in RequestProcessor (%s): %s. Traceback: %s'
-                             % (self.act_name, exc_val, exc_tb.print_tb))
+                logger.error(f'Exception occurred in RequestProcessor: '
+                             f'\n{"".join(traceback.format_tb(exc_tb))}')
                 return True
             return None
         except Exception as e:
-            logger.error('Could not stop subscriber monitor: %s' % e)
+            logger.error(f'Could not stop subscriber monitor: \n{"".join(traceback.format_tb(e.__traceback__))}')
             return None
 
-    def send(self, message: Message) -> ActResponse:
-        """Send message to conn.
+    def send(self,
+             message: Message,
+             echo_key_field: Optional[str] = None,
+             timeout: Optional[Union[int, float]] = None) -> Optional[str]:
+        """Sends message to conn. Returns 'MsgSeqNum' field of sent message's echo if 'echo_key_field' is set,
+        else None.
 
         Args:
-            message (Message): Message to send to conn.
+            message (Message): Message to send.
+            echo_key_field (str): Key field to catch sent message's echo. If not set, no echo will be returned.
+            timeout (int or float, optional): The time (in seconds) during which you are ready to wait for the echo.
+                The echo will be returned as soon as it is found, without waiting for the end of the timeout.
+                If not set, the gRPC context time will be used.
 
         Returns:
-            ActResponse class instance with status (SUCCESS or ERROR).
+            'MsgSeqNum' if 'echo_key_field' is set, else None.
         """
+        if not self._act_sender.send_message(message):
+            self._grpc_context_manager.cancel_context()
+            logger.debug('Context was cancelled because of message sending fail')
+            return None
 
-        send_request_act_response = self._rp_utils.send_message(message)
+        if echo_key_field is not None:
+            echo_message = self._receive_request_message_echo(message, echo_key_field, timeout)
+            if echo_message is not None:
+                return echo_message.fields['header'].message_value.fields['MsgSeqNum'].simple_value
 
-        if send_request_act_response.status == RequestStatus.ERROR:
-            self._context.cancel()
-
-        return send_request_act_response
+        return None
 
     def receive_first_matching(self,
                                message_filters: Dict[Callable, int],
                                timeout: Optional[Union[int, float]] = None,
                                check_previous_messages: bool = True) -> ActResponse:
-        """Returns the first message (wrapped in ActResponse class) from cache that matches one of the conditions.
+        """Returns the first message (wrapped in ActResponse class) from cache that matches one of the filters.
+        If no message found, None will be returned.
 
         Args:
             message_filters (Dict[lambda, RequestStatus]): The filter (lambda or function) through which the messages
                 from cache will be filtered out - as key, RequestStatus (SUCCESS or ERROR) - as value.
-            timeout (float, optional): The time (in seconds) during which you are ready to wait for the message.
+            timeout (int or float, optional): The time (in seconds) during which you are ready to wait for the message.
                 The message will be returned as soon as it is found, without waiting for the end of the timeout.
                 If not set, the gRPC context time will be used.
             check_previous_messages (bool, optional): Set True if you want to look for the message throughout all
                 received messages; set False if you want to check only newly received messages. Defaults to True.
 
         Returns:
-            ActResponse class instance with received message, status and checkpoint.
+            ActResponse class instance with received message, status and checkpoint, if any message found.
         """
 
         start_time = time()
 
         if timeout is None:
-            timeout = self._context.time_remaining()
+            timeout = self._grpc_context_manager.context_time_remaining()
 
-        status_messages_dict, _ = self._cache_processor.get_n_matching_within_timeout(
+        status_messages_dict, _ = self._cache_filter.get_n_matching_within_timeout(
             message_filters=message_filters,
             n=1,
             check_previous_messages=check_previous_messages,
@@ -119,22 +143,17 @@ class RequestProcessor:
             start_time=start_time
         )
 
-        received_messages_root_event_id = self._rp_utils.create_received_messages_root_event(
-            'first matching',
-            messages_received=self._cache_processor.get_number_of_received_messages(
-                status_messages_dict=status_messages_dict
-            ),
-            messages_expected=1
-        )
-
         runtime = time() - start_time
 
-        self._rp_utils.create_received_messages_events(status_messages_dict=status_messages_dict,
-                                                       root_event_id=received_messages_root_event_id,
-                                                       runtime=runtime)
+        act_responses = self._rp_utils.create_act_responses_list(status_messages_dict=status_messages_dict)
+        self._rp_utils.create_and_send_responses_events(receive_method_name='first matching',
+                                                        runtime=runtime,
+                                                        act_responses=act_responses)
 
-        return self._rp_utils.create_act_responses_list(status_messages_dict=status_messages_dict,
-                                                        root_event_id=received_messages_root_event_id)[0]
+        if act_responses is not None:
+            return act_responses[0]
+
+        return ActResponse(status=RequestStatus.ERROR, checkpoint=self._checkpoint)
 
     def receive_first_n_matching(self,
                                  message_filters: Dict[Callable, int],
@@ -142,7 +161,7 @@ class RequestProcessor:
                                  timeout: Optional[Union[int, float]] = None,
                                  check_previous_messages: bool = True) -> List[ActResponse]:
         """Returns a list of first N messages (each wrapped in ActResponse class) from cache that match
-        the conditions.
+        the filters. If no messages found, None will be returned.
 
         Args:
             message_filters (Dict[lambda, RequestStatus]): The filter (lambda or function) through which the messages
@@ -155,15 +174,15 @@ class RequestProcessor:
                 received messages; set False if you want to check only newly received messages. Defaults to True.
 
         Returns:
-            List of ActResponse class instances with received message, status and checkpoint.
+            List of ActResponse class instances with received message, status and checkpoint, if any message found.
         """
 
         start_time = time()
 
         if timeout is None:
-            timeout = self._context.time_remaining()
+            timeout = self._grpc_context_manager.context_time_remaining()
 
-        status_messages_dict, _ = self._cache_processor.get_n_matching_within_timeout(
+        status_messages_dict, _ = self._cache_filter.get_n_matching_within_timeout(
             message_filters=message_filters,
             n=n,
             check_previous_messages=check_previous_messages,
@@ -171,29 +190,23 @@ class RequestProcessor:
             start_time=start_time
         )
 
-        received_messages_root_event_id = self._rp_utils.create_received_messages_root_event(
-            'first n matching',
-            messages_received=self._cache_processor.get_number_of_received_messages(
-                status_messages_dict=status_messages_dict
-            ),
-            messages_expected=n
-        )
-
         runtime = time() - start_time
 
-        self._rp_utils.create_received_messages_events(status_messages_dict=status_messages_dict,
-                                                       root_event_id=received_messages_root_event_id,
-                                                       runtime=runtime)
+        act_responses = self._rp_utils.create_act_responses_list(status_messages_dict=status_messages_dict)
+        self._rp_utils.create_and_send_responses_events(receive_method_name='first n matching',
+                                                        act_responses=act_responses,
+                                                        number_of_responses_expected=n,
+                                                        runtime=runtime)
 
-        return self._rp_utils.create_act_responses_list(status_messages_dict=status_messages_dict,
-                                                        root_event_id=received_messages_root_event_id)
+        return act_responses or [ActResponse(status=RequestStatus.ERROR, checkpoint=self._checkpoint)]
 
     def receive_all_before_matching(self,
                                     message_filters: Dict[Callable, int],
                                     timeout: Optional[Union[int, float]] = None,
                                     check_previous_messages: bool = True) -> ActMultiResponse:
-        """Returns a list of messages (each wrapped in ActResponse class) from cache that precede a message that
-        matches one of the conditions. Message that matching condition is included in the list.
+        """Returns an ActMultiResponse with messages from cache that precede a message that
+        matches one of the filters. Message that matching condition is included in the list.
+        If no messages found, None will be returned.
 
         Args:
             message_filters (Dict[lambda, RequestStatus]): The filter (lambda or function) through which the messages
@@ -205,15 +218,15 @@ class RequestProcessor:
                 received messages; set False if you want to check only newly received messages. Defaults to True.
 
         Returns:
-            List of ActResponse class instances with received message, status and checkpoint.
+            List of ActResponse class instances with received message, status and checkpoint, if any message found.
         """
 
         start_time = time()
 
         if timeout is None:
-            timeout = self._context.time_remaining()
+            timeout = self._grpc_context_manager.context_time_remaining()
 
-        status_messages_dict, index = self._cache_processor.get_n_matching_within_timeout(
+        status_messages_dict, index = self._cache_filter.get_n_matching_within_timeout(
             message_filters=message_filters,
             n=1,
             check_previous_messages=check_previous_messages,
@@ -221,29 +234,24 @@ class RequestProcessor:
             start_time=start_time
         )
 
-        received_messages_root_event_id = self._rp_utils.create_received_messages_root_event(
-            'all before matching',
-            messages_received=self._cache_processor.get_number_of_received_messages(before_index=index)
-        )
-
-        for status in status_messages_dict:
-            status_messages_dict[status] = self._cache_processor.get_all_before_matching_from_cache(index=index)
-
         runtime = time() - start_time
 
-        self._rp_utils.create_received_messages_events(status_messages_dict=status_messages_dict,
-                                                       root_event_id=received_messages_root_event_id,
-                                                       runtime=runtime)
+        for status in status_messages_dict:
+            status_messages_dict[status] = self._cache_filter.get_all_before_matching_from_cache(index=index)
+        act_multi_response = self._rp_utils.create_act_multi_response(status_messages_dict=status_messages_dict)
+        self._rp_utils.create_and_send_responses_events(receive_method_name='all before matching',
+                                                        act_responses=act_multi_response,
+                                                        runtime=runtime)
 
-        return self._rp_utils.create_act_multi_response(status_messages_dict=status_messages_dict,
-                                                        root_event_id=received_messages_root_event_id)
+        return act_multi_response or ActMultiResponse(status=RequestStatus.ERROR, checkpoint=self._checkpoint)
 
     def receive_all_after_matching(self,
                                    message_filters: Dict[Callable, int],
                                    wait_time: Optional[Union[int, float]] = None,
                                    check_previous_messages: bool = True) -> ActMultiResponse:
-        """Returns a list of messages (each wrapped in ActResponse class) from cache that follows a message that
-        matches one of the conditions. Message that matching condition is included in the list.
+        """Returns a ActMultiResponse with messages from cache that follows a message that
+        matches one of the filters. Message that matching condition is included in the list.
+        If no messages found, None will be returned.
 
         Args:
             message_filters (Dict[lambda, RequestStatus]): The filter (lambda or function) through which the messages
@@ -254,42 +262,37 @@ class RequestProcessor:
                 received messages; set False if you want to check only newly received messages. Defaults to True.
 
         Returns:
-            List of ActResponse class instances with received message, status and checkpoint.
+            List of ActResponse class instances with received message, status and checkpoint, if any message found.
        """
 
         start_time = time()
 
         if wait_time:
-            self._rp_utils.wait(wait_time)
+            self._grpc_context_manager.wait(wait_time)
 
-        status_messages_dict, index = self._cache_processor.get_n_matching_immediately(
+        status_messages_dict, index = self._cache_filter.get_n_matching_immediately(
             message_filters=message_filters,
             check_previous_messages=check_previous_messages,
             n=1
         )
 
-        received_messages_root_event_id = self._rp_utils.create_received_messages_root_event(
-            'all after matching',
-            messages_received=self._cache_processor.get_number_of_received_messages(after_index=index)
-        )
-
-        for status in status_messages_dict:
-            status_messages_dict[status] = self._cache_processor.get_all_after_matching_from_cache(index=index)
-
         runtime = time() - start_time
 
-        self._rp_utils.create_received_messages_events(status_messages_dict=status_messages_dict,
-                                                       root_event_id=received_messages_root_event_id,
-                                                       runtime=runtime)
+        for status in status_messages_dict:
+            status_messages_dict[status] = self._cache_filter.get_all_after_matching_from_cache(index=index)
+        act_multi_response = self._rp_utils.create_act_multi_response(status_messages_dict=status_messages_dict)
+        self._rp_utils.create_and_send_responses_events(receive_method_name='all after matching',
+                                                        act_responses=act_multi_response,
+                                                        runtime=runtime)
 
-        return self._rp_utils.create_act_multi_response(status_messages_dict=status_messages_dict,
-                                                        root_event_id=received_messages_root_event_id)
+        return act_multi_response or ActMultiResponse(status=RequestStatus.ERROR, checkpoint=self._checkpoint)
 
     def receive_all_matching(self,
                              message_filters: Dict[Callable, int],
                              wait_time: Optional[Union[int, float]] = None,
                              check_previous_messages: bool = True) -> List[ActResponse]:
-        """Returns a list of messages (wrapped in ActResponse class) from cache that matches conditions.
+        """Returns a list of messages (wrapped in ActResponse class) from cache that matches filters.
+        If no messages found, None will be returned.
 
         Args:
             message_filters (Dict[lambda, RequestStatus]): The filter (lambda or function) through which the messages
@@ -300,42 +303,67 @@ class RequestProcessor:
                 received messages; set False if you want to check only newly received messages. Defaults to True.
 
         Returns:
-            List of ActResponse class instances with received message, status and checkpoint.
+            List of ActResponse class instances with received message, status and checkpoint, if any message found.
         """
 
         start_time = time()
 
         if wait_time:
-            self._rp_utils.wait(wait_time)
+            self._grpc_context_manager.wait(wait_time)
 
-        status_messages_dict, index = self._cache_processor.get_n_matching_immediately(
+        status_messages_dict, index = self._cache_filter.get_n_matching_immediately(
             message_filters=message_filters,
             check_previous_messages=check_previous_messages
         )
 
-        received_messages_root_event_id = self._rp_utils.create_received_messages_root_event(
-            'all matching',
-            messages_received=self._cache_processor.get_number_of_received_messages(
-                status_messages_dict=status_messages_dict
-            )
-        )
-
         runtime = time() - start_time
 
-        self._rp_utils.create_received_messages_events(status_messages_dict=status_messages_dict,
-                                                       root_event_id=received_messages_root_event_id,
-                                                       runtime=runtime)
+        act_responses = self._rp_utils.create_act_responses_list(status_messages_dict=status_messages_dict)
+        self._rp_utils.create_and_send_responses_events(receive_method_name='all matching',
+                                                        act_responses=act_responses,
+                                                        runtime=runtime)
 
-        return self._rp_utils.create_act_responses_list(status_messages_dict=status_messages_dict,
-                                                        root_event_id=received_messages_root_event_id)
+        return act_responses or [ActResponse(status=RequestStatus.ERROR, checkpoint=self._checkpoint)]
 
     @property
     def cache_size(self) -> int:
         """Returns a number of messages in cache."""
 
-        return self._cache_processor.cache_size
+        return self._cache.size
 
     def clear_cache(self) -> None:
         """Deletes all messages from cache."""
 
-        self._cache_processor.clear_cache()
+        self._cache.clear()
+
+    def _receive_request_message_echo(self,
+                                      message: Message,
+                                      echo_key_field: str,
+                                      timeout: Optional[Union[int, float]]) -> Optional[Message]:
+        start_time = time()
+
+        if timeout is None:
+            timeout = self._grpc_context_manager.context_time_remaining()
+
+        echo_filter = lambda echo: (  # noqa: E731, ECE001
+                echo.fields[echo_key_field] == message.fields[echo_key_field]
+                and echo.metadata.message_type == message.metadata.message_type
+                and echo.metadata.id.direction == Direction.SECOND
+                and echo.metadata.id.connection_id.session_alias == message.metadata.id.connection_id.session_alias
+        )
+
+        status_messages_dict, _ = self._cache_filter.get_n_matching_within_timeout(
+            message_filters={echo_filter: RequestStatus.SUCCESS},
+            n=1,
+            check_previous_messages=False,
+            timeout=timeout,
+            start_time=start_time
+        )
+
+        act_responses = self._rp_utils.create_act_responses_list(status_messages_dict=status_messages_dict)
+
+        if act_responses is not None:
+            return act_responses[0].message
+
+        logger.error(f'Cannot find echo with key field {echo_key_field} of message {message}')
+        return None

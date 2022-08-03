@@ -12,27 +12,29 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typing import Any
-
+import grpc
 from th2_grpc_common.common_pb2 import EventID
 
 
-class ActParameters:
-    """Contains parameters used in RequestProcessor context manager.
+class GrpcMethodAttributes:
+    """Contains parameters of gRPC implementation method. GrpcMethodAttributes are used in RequestProcessor
+    context manager.
 
     Args:
-        context: gRPC method context.
+        context (grpc.RpcContext): gRPC method context.
         request_event_id (EventID): Request event ID.
-        act_name (str): Act name. This will be shown in GIU as gRPC method event name.
+        method_name (str): Act name. This will be shown in GIU as gRPC method event name.
         request_description (str, optional): Request description. This will be shown in GIU as request event name.
     """
 
+    __slots__ = ('context', 'method_name', 'request_event_id', 'request_description')
+
     def __init__(self,
-                 context: Any,
+                 context: grpc.RpcContext,
+                 method_name: str,
                  request_event_id: EventID,
-                 act_name: str,
                  request_description: str = ''):
         self.context = context
+        self.method_name = method_name
         self.request_event_id = request_event_id
-        self.act_name = act_name
         self.request_description = request_description

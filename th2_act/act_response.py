@@ -12,15 +12,17 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typing import List, Optional, Union
+from typing import Iterator, List, Optional, Union
 
 from th2_grpc_common.common_pb2 import Checkpoint, Message, RequestStatus
 
 
 class ActResponse:
-    """ActResponse may be returned to act implementation by Act. The class instance can contain message, status,
-    checkpoint and text fields, which can be used when creating custom response objects.
+    """ActResponse may be returned to act implementation by Act. The class instance can contain message, status and
+    checkpoint fields, which can be used when creating custom response objects.
     """
+
+    __slots__ = ('message', 'status', 'checkpoint')
 
     def __init__(self,
                  message: Optional[Message] = None,
@@ -33,13 +35,27 @@ class ActResponse:
 
 class ActMultiResponse:
     """ActMultiResponse may be returned to act implementation by Act. The class instance can contain list of messages,
-    status, checkpoint and text fields, which can be used when creating custom response objects.
+    status and checkpoint fields, which can be used when creating custom response objects.
     """
+
+    __slots__ = ('messages', 'status', 'checkpoint')
 
     def __init__(self,
                  messages: Optional[List[Message]] = None,
                  status: Union[str, int] = RequestStatus.SUCCESS,
                  checkpoint: Optional[Checkpoint] = None) -> None:
-        self.messages = messages
+        if messages is None:
+            self.messages = []
+        else:
+            self.messages = messages
         self.status = RequestStatus(status=status)  # type: ignore
         self.checkpoint = checkpoint
+
+    def __iter__(self) -> Iterator:
+        return self.messages.__iter__()
+
+    def __getitem__(self, item: int) -> Message:
+        return self.messages[item]
+
+    def __len__(self) -> int:
+        return len(self.messages)

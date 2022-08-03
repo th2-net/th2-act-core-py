@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import logging
+import traceback
 from typing import Set
 
 from th2_common.schema.message.message_listener import MessageListener
@@ -37,4 +38,4 @@ class SubscriptionManager(MessageListener):
             try:
                 listener.handler(consumer_tag, message_batch)
             except Exception as e:
-                logger.error('Cannot handle batch: %s' % e)
+                logger.error(f'Cannot handle batch: \n{"".join(traceback.format_tb(e.__traceback__))}')
