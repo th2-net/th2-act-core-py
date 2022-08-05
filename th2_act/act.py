@@ -74,7 +74,7 @@ class Act:
                     handlers_servicers_dict[handler] = _get_func_add_servicer_to_server(handler)
             except Exception as e:
                 logger.error(f'Cannot upload handler with the path '
-                             f'{handlers_package.__name__}.{handler_path.stem}: '
+                             f'{handlers_package.__name__}.{handler_path.stem}: {e}'
                              f'\n{"".join(traceback.format_tb(e.__traceback__))}')
 
         logger.info(f'Handlers upload finished. Total: {len(handlers_servicers_dict)} handler(s)')

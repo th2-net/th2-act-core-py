@@ -38,4 +38,4 @@ class SubscriptionManager(MessageListener):
             try:
                 listener.handler(consumer_tag, message_batch)
             except Exception as e:
-                logger.error(f'Cannot handle batch: \n{"".join(traceback.format_tb(e.__traceback__))}')
+                logger.error(f'Cannot handle batch: {e} \n{"".join(traceback.format_tb(e.__traceback__))}')

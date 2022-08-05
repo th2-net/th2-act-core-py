@@ -114,7 +114,7 @@ class ActSender:
 
         except Exception as e:
             logger.error(f'Cannot send event "{event.name}" with attached messages IDs '
-                         f'{event.attached_message_ids} to estore: '
+                         f'{event.attached_message_ids} to estore: {e}'
                          f'\n{"".join(traceback.format_tb(e.__traceback__))}')
 
     def _send_with_message_router(self, message: Message) -> bool:
@@ -134,7 +134,7 @@ class ActSender:
                 return False
 
         except Exception as e:
-            logger.error(f'Cannot send the message with session alias '
+            logger.error(f'Cannot send the message with session alias {e}'
                          f'{message.metadata.id.connection_id.session_alias}: '
                          f'\n{"".join(traceback.format_tb(e.__traceback__))}')
             return False

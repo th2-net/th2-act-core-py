@@ -73,12 +73,12 @@ class RequestProcessor:
             self._subscription_manager.unregister(message_listener=self._act_receiver.message_listener)
             self.clear_cache()
             if exc_type:
-                logger.error(f'Exception occurred in RequestProcessor: '
+                logger.error(f'Exception occurred in RequestProcessor: {exc_type}'
                              f'\n{"".join(traceback.format_tb(exc_tb))}')
                 return True
             return None
         except Exception as e:
-            logger.error(f'Could not stop subscriber monitor: \n{"".join(traceback.format_tb(e.__traceback__))}')
+            logger.error(f'Could not stop subscriber monitor: {e}\n{"".join(traceback.format_tb(e.__traceback__))}')
             return None
 
     def send(self,
@@ -365,5 +365,7 @@ class RequestProcessor:
         if act_responses is not None:
             return act_responses[0].message
 
-        logger.error(f'Cannot find echo with key field {echo_key_field} of message {message}')
+        logger.error(f'Cannot find echo with key field {echo_key_field} of message '
+                     f'with type {message.metadata.message_type} and '
+                     f'session alias {message.metadata.id.connection_id.session_alias}')
         return None

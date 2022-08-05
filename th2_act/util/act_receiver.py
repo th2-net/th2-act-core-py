@@ -44,7 +44,7 @@ class ActReceiver:
             self.cache.add(message for message in message_batch.messages)
 
         except Exception as e:
-            logger.error(f'Could not process incoming messages: '
+            logger.error(f'Could not process incoming messages: {e}'
                          f'\n{"".join(traceback.format_tb(e.__traceback__))}')
 
     def process_incoming_messages_with_prefilter(self, consumer_tag: str, message_batch: MessageBatch) -> None:
@@ -53,7 +53,7 @@ class ActReceiver:
             self.cache.add(message for message in message_batch.messages if check(self.prefilter, message))
 
         except Exception as e:
-            logger.error(f'Could not process incoming messages: '
+            logger.error(f'Could not process incoming messages: {e}'
                          f'\n{"".join(traceback.format_tb(e.__traceback__))}')
 
 
