@@ -100,7 +100,7 @@ class RequestProcessor:
         """
         if not self._act_sender.send_message(message):
             self._grpc_context_manager.cancel_context()
-            logger.debug('Context was cancelled because of message sending fail')
+            logger.info('Context was cancelled because of message sending fail')
             return None
 
         if echo_key_field is not None:

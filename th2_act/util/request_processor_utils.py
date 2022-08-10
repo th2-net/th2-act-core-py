@@ -15,6 +15,7 @@
 import logging
 from typing import Dict, List, Optional, Union
 
+from google.protobuf.text_format import MessageToString
 from th2_act.act_response import ActMultiResponse, ActResponse
 from th2_act.util.act_sender import ActSender
 from th2_grpc_common.common_pb2 import EventID, Message, RequestStatus
@@ -78,7 +79,10 @@ class RequestProcessorUtils:
                                                                            responses_root_event=responses_root_event,
                                                                            status=response.status.status)
 
-                logger.debug(f'Received {len(act_responses)} messages: {act_responses}')
+                logger.debug(
+                    f'Received {len(act_responses)} messages: '  # type: ignore
+                    f'{[MessageToString(act_response.message, as_one_line=True) for act_response in act_responses]}'
+                )
 
             elif isinstance(act_responses, ActMultiResponse):
                 for message in act_responses.messages:
@@ -86,7 +90,10 @@ class RequestProcessorUtils:
                                                                            responses_root_event=responses_root_event,
                                                                            status=act_responses.status.status)
 
-                logger.debug(f'Received {len(act_responses)} messages: {act_responses.messages}')
+                logger.debug(
+                    f'Received {len(act_responses)} messages: '
+                    f'{[MessageToString(m, as_one_line=True) for m in act_responses.messages]}'
+                )
 
     def create_act_responses_list(self,
                                   status_messages_dict: Dict[int, List[Message]]) -> Optional[List[ActResponse]]:

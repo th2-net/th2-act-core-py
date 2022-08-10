@@ -15,6 +15,7 @@
 import logging
 import traceback
 
+from google.protobuf.text_format import MessageToString
 from th2_act.grpc_method_attributes import GrpcMethodAttributes
 import th2_act.util.act_events as events
 from th2_act.util.grpc_context_manager import GRPCContextManager
@@ -62,7 +63,7 @@ class ActSender:
             event = events.create_send_request_succeed_event(message=message, act_event_id=self.method_event_id)
             self._send_with_event_router(event)
 
-            logger.debug('Message was sent successfully: %s' % message)
+            logger.debug('Message was sent successfully: %s' % MessageToString(message, as_one_line=True))
             return True
 
         return False
