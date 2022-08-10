@@ -80,7 +80,7 @@ class RequestProcessorUtils:
                                                                            status=response.status.status)
 
                 logger.debug(
-                    f'Received {len(act_responses)} messages: '  # type: ignore
+                    f'Filtered response messages: '  # type: ignore
                     f'{[MessageToString(act_response.message, as_one_line=True) for act_response in act_responses]}'
                 )
 
@@ -91,7 +91,7 @@ class RequestProcessorUtils:
                                                                            status=act_responses.status.status)
 
                 logger.debug(
-                    f'Received {len(act_responses)} messages: '
+                    f'Filtered response messages: '
                     f'{[MessageToString(m, as_one_line=True) for m in act_responses.messages]}'
                 )
 
