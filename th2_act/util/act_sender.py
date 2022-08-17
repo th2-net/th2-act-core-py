@@ -14,6 +14,7 @@
 
 import logging
 import traceback
+from typing import List
 
 from google.protobuf.text_format import MessageToString
 from th2_act.grpc_method_attributes import GrpcMethodAttributes
@@ -61,7 +62,7 @@ class ActSender:
 
         if self._send_with_message_router(message):
             event = events.create_send_request_succeed_event(message=message, act_event_id=self.method_event_id)
-            self._send_with_event_router(event)
+            self._send_with_event_router(EventBatch(events=[event]))
 
             logger.debug('Message was sent successfully: %s' % MessageToString(message, as_one_line=True))
             return True
@@ -72,7 +73,7 @@ class ActSender:
         event = events.create_grpc_method_event(request_event_id=request_event_id,
                                                 method_name=method_name,
                                                 description=description)
-        self._send_with_event_router(event)
+        self._send_with_event_router(EventBatch(events=[event]))
 
         return event.id
 
@@ -80,33 +81,20 @@ class ActSender:
         event = events.create_responses_root_event(method_event_id=self.method_event_id,
                                                    status=status,
                                                    event_name=event_name)
-        self._send_with_event_router(event)
+        self._send_with_event_router(EventBatch(events=[event]))
         return event.id
 
-    def create_and_send_response_succeed_event(self,
-                                               response: Message,
-                                               responses_root_event: EventID,
-                                               status: int) -> EventID:
-        event = events.create_receive_response_succeed_event(response=response,
-                                                             responses_root_event=responses_root_event,
-                                                             status=status)
-        self._send_with_event_router(event)
+    def send_responses_events(self,
+                              responses_events: List[Event]) -> None:
+        event_batch = EventBatch(events=responses_events)
+        self._send_with_event_router(event_batch)
 
-        return event.id
-
-    def create_and_send_response_failed_event(self, text: str, responses_root_event: EventID) -> EventID:
-        event = events.create_receive_response_failed_event(text=text,
-                                                            responses_root_event=responses_root_event)
-        self._send_with_event_router(event)
-
-        return event.id
-
-    def _send_with_event_router(self, event: Event) -> None:
+    def _send_with_event_router(self, event_batch: EventBatch) -> None:
         try:
             if not self.is_sending_allowed:
                 return
             elif self.grpc_context_manager.is_context_active():
-                self.event_router.send_all(message=EventBatch(events=[event]))
+                self.event_router.send_all(message=event_batch)
             else:
                 self.is_sending_allowed = False
                 event = events.create_context_cancelled_event(self.method_event_id)
@@ -114,8 +102,8 @@ class ActSender:
                 logger.warning(f'Cannot send event: {self.method_name} gRPC context was cancelled by client')
 
         except Exception as e:
-            logger.error(f'Cannot send event "{event.name}" with attached messages IDs '
-                         f'{event.attached_message_ids} to estore: {e}'
+            logger.error(f'Cannot send events "{[event.name for event in event_batch.events]}" '
+                         f'with attached messages IDs to estore: {e}'
                          f'\n{"".join(traceback.format_tb(e.__traceback__))}')
 
     def _send_with_message_router(self, message: Message) -> bool:

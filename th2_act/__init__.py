@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from th2_act.act import Act
-from th2_act.act_response import ActResponse
+from th2_act.act_responses import ActMultiResponse, ActResponsesList, ActSingleResponse
 from th2_act.act_server import ActServer
 from th2_act.grpc_method_attributes import GrpcMethodAttributes
 from th2_act.handler_attributes import HandlerAttributes
