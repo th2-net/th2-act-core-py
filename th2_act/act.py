@@ -20,9 +20,7 @@ from typing import Any, Callable, Dict, Optional
 
 from th2_act.handler_attributes import HandlerAttributes
 from th2_act.util.subscription_manager import SubscriptionManager
-from th2_common.schema.grpc.router.grpc_router import GrpcRouter
 from th2_common.schema.message.message_router import MessageRouter
-from th2_grpc_check1.check1_service import Check1Service
 
 logger = logging.getLogger()
 
@@ -31,7 +29,7 @@ class Act:
     """Contains initialized ActHandler classes (uploaded from files) instances.
 
     Args:
-        grpc_router (GrpcRouter): gRPC router from CommonFactory.
+        check1_service (Check1Service): Check1 service from gRPC router.
         message_router (MessageRouter): Message router from CommonFactory.
         event_router (MessageRouter): Event router from CommonFactory.
         handlers_package_relative_path (str, optional): A relative path to the package with the handlers.
@@ -39,14 +37,14 @@ class Act:
     """
 
     def __init__(self,
-                 grpc_router: GrpcRouter,
+                 check1_service: Any,
                  message_router: MessageRouter,
                  event_router: MessageRouter,
                  handlers_package_relative_path: str = 'handlers'):
         subscription_manager = SubscriptionManager()
         message_router.subscribe_all(subscription_manager)
 
-        self._handler_attrs = HandlerAttributes(check1_connector=grpc_router.get_service(Check1Service),  # type: ignore
+        self._handler_attrs = HandlerAttributes(check1_connector=check1_service,
                                                 message_router=message_router,
                                                 event_router=event_router,
                                                 subscription_manager=subscription_manager)
