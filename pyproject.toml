@@ -1,17 +1,17 @@
 [tool.poetry]
-name = "th2-act"
+name = "th2-act-core"
 version = "1.0.0"
 description = "Python library with useful tools for creating custom Act implementations"
 authors = ["TH2-devs <th2-devs@exactprosystems.com>"]
 readme = "README.md"
 license = "Apache License 2.0"
-homepage = "https://github.com/th2-net/th2-act-py"
-repository = "https://github.com/th2-net/th2-act-py"
+homepage = "https://github.com/th2-net/th2-act-core-py"
+repository = "https://github.com/th2-net/th2-act-core-py"
 include = [
     "LICENSE",
 ]
 packages = [
-    {include = 'th2_act'},
+    {include = 'th2_act_core'},
 ]
 
 [tool.poetry.dependencies]

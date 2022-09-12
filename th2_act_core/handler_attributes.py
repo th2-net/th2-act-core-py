@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from th2_act.util.subscription_manager import SubscriptionManager
+from th2_act_core.util.subscription_manager import SubscriptionManager
 from th2_common.schema.message.message_router import MessageRouter
 from th2_grpc_check1.check1_service import Check1Service
 

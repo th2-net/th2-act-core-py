@@ -17,7 +17,7 @@ import logging
 from typing import List, Optional, Union
 
 from google.protobuf.text_format import MessageToString
-import th2_act.util.act_events as events
+import th2_act_core.util.act_events as events
 from th2_grpc_common.common_pb2 import Event, EventID, Message, RequestStatus
 
 logger = logging.getLogger()

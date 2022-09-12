@@ -17,9 +17,9 @@ import traceback
 from typing import List
 
 from google.protobuf.text_format import MessageToString
-from th2_act.grpc_method_attributes import GrpcMethodAttributes
-import th2_act.util.act_events as events
-from th2_act.util.grpc_context_manager import GRPCContextManager
+from th2_act_core.grpc_method_attributes import GrpcMethodAttributes
+import th2_act_core.util.act_events as events
+from th2_act_core.util.grpc_context_manager import GRPCContextManager
 from th2_common.schema.message.message_router import MessageRouter
 from th2_grpc_check1.check1_pb2 import CheckpointRequest, CheckpointResponse
 from th2_grpc_check1.check1_service import Check1Service

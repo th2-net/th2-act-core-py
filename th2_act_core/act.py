@@ -18,8 +18,8 @@ from pathlib import Path
 import traceback
 from typing import Any, Callable, Dict, Optional
 
-from th2_act.handler_attributes import HandlerAttributes
-from th2_act.util.subscription_manager import SubscriptionManager
+from th2_act_core.handler_attributes import HandlerAttributes
+from th2_act_core.util.subscription_manager import SubscriptionManager
 from th2_common.schema.message.message_router import MessageRouter
 
 logger = logging.getLogger()

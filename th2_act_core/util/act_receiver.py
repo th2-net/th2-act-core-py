@@ -16,7 +16,7 @@ import logging
 import traceback
 from typing import Callable, Dict, List, Optional
 
-from th2_act.util.cache import Cache
+from th2_act_core.util.cache import Cache
 from th2_common.schema.message.message_listener import MessageListener
 from th2_grpc_common.common_pb2 import Message, MessageBatch
 

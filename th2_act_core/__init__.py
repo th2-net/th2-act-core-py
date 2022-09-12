@@ -12,10 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from th2_act.act import Act
-from th2_act.act_message import ActMessage
-from th2_act.act_server import ActServer
-from th2_act.grpc_method_attributes import GrpcMethodAttributes
-from th2_act.handler_attributes import HandlerAttributes
-from th2_act.request_processor import RequestProcessor
-from th2_act.util.act_sender import ActSender
+from th2_act_core.act import Act
+from th2_act_core.act_message import ActMessage
+from th2_act_core.act_server import ActServer
+from th2_act_core.grpc_method_attributes import GrpcMethodAttributes
+from th2_act_core.handler_attributes import HandlerAttributes
+from th2_act_core.request_processor import RequestProcessor
+from th2_act_core.util.act_sender import ActSender

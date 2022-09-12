@@ -16,10 +16,10 @@ from itertools import islice
 from time import time
 from typing import Callable, Dict, Iterable, Iterator, List, Optional, Tuple, Union
 
-from th2_act import ActMessage
-from th2_act.util.act_receiver import check
-from th2_act.util.cache import Cache
-from th2_act.util.grpc_context_manager import GRPCContextManager
+from th2_act_core import ActMessage
+from th2_act_core.util.act_receiver import check
+from th2_act_core.util.cache import Cache
+from th2_act_core.util.grpc_context_manager import GRPCContextManager
 from th2_grpc_common.common_pb2 import RequestStatus
 
 

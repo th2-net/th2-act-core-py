@@ -16,14 +16,14 @@ import logging
 import traceback
 from typing import Any, Callable, Iterable, List, Optional, Union
 
-from th2_act.act_message import ActMessage, ActMessageUtil
-from th2_act.grpc_method_attributes import GrpcMethodAttributes
-from th2_act.handler_attributes import HandlerAttributes
-from th2_act.util.act_receiver import ActReceiver
-from th2_act.util.act_sender import ActSender
-from th2_act.util.cache import Cache
-from th2_act.util.cache_filter import CacheFilter
-from th2_act.util.grpc_context_manager import GRPCContextManager
+from th2_act_core.act_message import ActMessage, ActMessageUtil
+from th2_act_core.grpc_method_attributes import GrpcMethodAttributes
+from th2_act_core.handler_attributes import HandlerAttributes
+from th2_act_core.util.act_receiver import ActReceiver
+from th2_act_core.util.act_sender import ActSender
+from th2_act_core.util.cache import Cache
+from th2_act_core.util.cache_filter import CacheFilter
+from th2_act_core.util.grpc_context_manager import GRPCContextManager
 from th2_grpc_common.common_pb2 import Direction, EventID, Message, RequestStatus
 
 logger = logging.getLogger()
