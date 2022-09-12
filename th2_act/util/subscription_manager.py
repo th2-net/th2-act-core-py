@@ -14,7 +14,7 @@
 
 import logging
 import traceback
-from typing import Set
+from typing import Set, Tuple
 
 from th2_common.schema.message.message_listener import MessageListener
 from th2_grpc_common.common_pb2 import MessageBatch
@@ -33,9 +33,9 @@ class SubscriptionManager(MessageListener):
     def unregister(self, message_listener: MessageListener) -> None:
         self.listeners.remove(message_listener)
 
-    def handler(self, consumer_tag: str, message_batch: MessageBatch) -> None:
+    def handler(self, attributes: Tuple, message_batch: MessageBatch) -> None:
         for listener in self.listeners:
             try:
-                listener.handler(consumer_tag, message_batch)
+                listener.handler(attributes, message_batch)
             except Exception as e:
                 logger.error(f'Cannot handle batch: {e} \n{"".join(traceback.format_tb(e.__traceback__))}')

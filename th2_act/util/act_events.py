@@ -13,13 +13,10 @@
 #   limitations under the License.
 
 from datetime import datetime
-import logging
-from typing import Optional
+from typing import Optional, Union
 
 from th2_common_utils import create_event, create_event_id, message_to_table
 from th2_grpc_common.common_pb2 import Event, EventID, EventStatus, Message
-
-logger = logging.getLogger()
 
 
 def create_grpc_method_event(request_event_id: EventID,
@@ -57,7 +54,7 @@ def create_send_request_succeed_event(message: Message, act_event_id: EventID) -
 
 def create_receive_response_succeed_event(response: Message,
                                           responses_root_event: EventID,
-                                          status: int) -> Event:
+                                          status: Union[str, int]) -> Event:
     event: Event = create_event(event_id=create_event_id(),
                                 parent_id=responses_root_event,
                                 event_type='Incoming message',

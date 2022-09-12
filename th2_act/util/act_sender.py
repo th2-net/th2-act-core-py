@@ -49,7 +49,6 @@ class ActSender:
         self.method_event_id = self.create_and_send_method_event(request_event_id=method_attrs.request_event_id,
                                                                  method_name=method_attrs.method_name,
                                                                  description=method_attrs.request_description)
-        self.checkpoint = self.register_checkpoint()
 
     def register_checkpoint(self) -> Checkpoint:
         checkpoint = CheckpointRequest(parent_event_id=self.method_event_id)

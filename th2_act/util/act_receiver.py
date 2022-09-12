@@ -49,8 +49,10 @@ class ActReceiver:
 
     def process_incoming_messages_with_prefilter(self, consumer_tag: str, message_batch: MessageBatch) -> None:
         try:
-            logger.debug('Received MessageBatch with %i messages' % len(message_batch.messages))
-            self.cache.add(message for message in message_batch.messages if check(self.prefilter, message))
+            prefiltered_messages = [message for message in message_batch.messages if check(self.prefilter, message)]
+            logger.debug('Received MessageBatch with %i messages, prefiltered %i messages'
+                         % (len(message_batch.messages), len(prefiltered_messages)))
+            self.cache.add(prefiltered_messages)
 
         except Exception as e:
             logger.error(f'Could not process incoming messages: {e}'

@@ -21,7 +21,7 @@ logger = logging.getLogger()
 
 
 class ActServer:
-    """Act server using ActHandler class instances described in act implementation.
+    """Act server use ActHandler class instances described in act implementation.
 
     Args:
         server (grpc.Server): Server of gRPC router from CommonFactory.

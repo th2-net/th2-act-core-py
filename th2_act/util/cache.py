@@ -12,12 +12,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import logging
-from typing import Dict, Iterable, Iterator, List, Union
+from typing import Dict, Iterable, Iterator, List, Optional
 
 from th2_grpc_common.common_pb2 import Message
-
-logger = logging.getLogger()
 
 
 StatusMessagesDict = Dict[int, List[Message]]
@@ -32,8 +29,18 @@ class Cache:
     def __iter__(self) -> Iterator:
         return self.cache.__iter__()
 
-    def __getitem__(self, item: Union[int, slice]) -> Union[Message, List[Message]]:
+    def __getitem__(self, item: slice) -> Iterable:
         return self.cache[item]
+
+    def get_all_before_matching_from_cache(self, index: Optional[int]) -> List[Message]:
+        if index is not None:
+            return self.cache[0:index + 1]
+        return []
+
+    def get_all_after_matching_from_cache(self, index: Optional[int]) -> List[Message]:
+        if index is not None:
+            return self.cache[index:self.size]
+        return []
 
     @property
     def size(self) -> int:
